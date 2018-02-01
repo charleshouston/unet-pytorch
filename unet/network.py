@@ -55,7 +55,6 @@ class UNet3D(nn.Module):
             if i == 0:
                 features_in = 1 # TODO: adapt for RGB images
             else:
-                layers.append(nn.MaxPool3d(self.pool_size, self.pool_size))
                 features_in = n_features
 
             # First convolution + batch norm
@@ -154,8 +153,7 @@ class UNet3D(nn.Module):
         # Analysis path
         for i in range(self.n_layer):
             if i != 0:
-                x = self.layers[layer_num](x) # max pooling except first layer
-                layer_num += 1
+                x = F.max_pool3d(x, self.pool_size, stride=self.pool_size)
 
             # First convolution + batch norm + RELU
             x = self.layers[layer_num](x)
