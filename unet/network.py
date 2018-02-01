@@ -35,10 +35,63 @@ class UNet3D(nn.Module):
         self.conv_size = conv_size
         self.deconv_size = deconv_size
 
-        self.pool = nn.MaxPool3d(self.pool_size, self.pool_size)
+        self.layers = self.__construct_layers()
 
+        # Crop sizes for concatenation at shortcut connections
         self.dimen_diff = [self.calc_dimen_diff(i)
                            for i in range(1, self.n_layer)]
+
+    def __construct_layers(self):
+        """Instantiates layers for network.
+
+        Returns:
+            A list of layers in the network.
+        """
+        layers = []
+        n_features = self.features_root
+
+        # Analysis path
+        for i in range(self.n_layer):
+            if i == 0:
+                features_in = 1 # TODO: adapt for RGB images
+            else:
+                layers.append(nn.MaxPool3d(self.pool_size, self.pool_size))
+                features_in = n_features
+
+            # First convolution + batch norm
+            layers.append(nn.Conv3d(features_in, n_features,
+                                    kernel_size=self.conv_size))
+            layers.append(nn.BatchNorm3d(n_features))
+            n_features *= 2
+
+            # Second convolution + batch norm
+            layers.append(nn.Conv3d(n_features//2, n_features,
+                                    kernel_size=self.conv_size))
+            layers.append(nn.BatchNorm3d(n_features))
+
+        # Synthesis path
+        for i in range(self.n_layer-1, 0, -1):
+            # Upconvolution
+            layers.append(nn.ConvTranspose3d(n_features, n_features,
+                                             kernel_size=self.deconv_size,
+                                             stride=self.deconv_size))
+
+            # First convolution + batch norm
+            layers.append(nn.Conv3d(n_features + n_features//2,
+                                    n_features//2, kernel_size=self.conv_size))
+            n_features //= 2
+            layers.append(nn.BatchNorm3d(n_features))
+
+            # Second convolution + batch norm
+            layers.append(nn.Conv3d(n_features, n_features,
+                                    kernel_size=self.conv_size))
+            layers.append(nn.BatchNorm3d(n_features))
+
+        # Final convolution layer
+        layers.append(nn.Conv3d(n_features, self.n_class,
+                                kernel_size=1))
+
+        return layers
 
     def __calc_layer_dimension(self, n: int) -> List[int]:
         """Calculates the shape of a U-Net layer for shortcut connections.
@@ -95,69 +148,58 @@ class UNet3D(nn.Module):
         Returns:
             The output of the network.
         """
-        n_features = self.features_root
-        dw_layers = []
+        dw_features = []
+        layer_num = 0 # variable to iterate through self.layers
+
         # Analysis path
         for i in range(self.n_layer):
-            if i == 0:
-                features_in = 1 # TODO: adapt for RGB images
-            else:
-                x = self.pool(x) # max pooling except first layer
-                features_in = n_features
+            if i != 0:
+                x = self.layers[layer_num](x) # max pooling except first layer
+                layer_num += 1
 
             # First convolution + batch norm + RELU
-            conv_1 = nn.Conv3d(features_in, n_features,
-                               kernel_size=self.conv_size)
-            x = conv_1(x)
-            norm = nn.BatchNorm3d(n_features)
-            x = F.relu(norm(x))
+            x = self.layers[layer_num](x)
+            layer_num += 1
+            x = F.relu(self.layers[layer_num](x))
+            layer_num += 1
 
             # Second convolution + batch norm + RELU
-            n_features *= 2
-            conv_2 = nn.Conv3d(n_features // 2, n_features,
-                               kernel_size=self.conv_size)
-            x = conv_2(x)
-            norm = nn.BatchNorm3d(n_features)
-            x = F.relu(norm(x))
+            x = self.layers[layer_num](x)
+            layer_num += 1
+            x = F.relu(self.layers[layer_num](x))
+            layer_num += 1
 
             if i != self.n_layer:
-                dw_layers.append(x) # save analysis layers for shortcuts later
+                dw_features.append(x) # save analysis layers for shortcuts later
 
         # Synthesis path
         for i in range(self.n_layer-1, 0, -1):
             # Upconvolution
-            deconv = nn.ConvTranspose3d(n_features, n_features,
-                                        kernel_size=self.deconv_size,
-                                        stride=self.deconv_size)
-            x = deconv(x)
+            x = self.layers[layer_num](x)
+            layer_num += 1
 
             # Shortcut connection
             difference = self.dimen_diff[i - 1] # size difference for shortcut
             crop = [(di // 2 + (di % 2 > 0), di // 2)
                            for di in difference]
-            shortcut = dw_layers[i-1][:,:,
-                (crop[0][0]):(dw_layers[i-1].size()[2] - crop[0][1]),
-                (crop[1][0]):(dw_layers[i-1].size()[3] - crop[1][1]),
-                (crop[2][0]):(dw_layers[i-1].size()[4] - crop[2][1])]
+            shortcut = dw_features[i-1][:,:,
+                (crop[0][0]):(dw_features[i-1].size()[2] - crop[0][1]),
+                (crop[1][0]):(dw_features[i-1].size()[3] - crop[1][1]),
+                (crop[2][0]):(dw_features[i-1].size()[4] - crop[2][1])]
             x = torch.cat((shortcut, x), dim=1)
 
             # First convolution + batch norm + RELU
-            conv_1 = nn.Conv3d(n_features+shortcut.size()[1],
-                               n_features // 2, kernel_size=self.conv_size)
-            n_features //= 2
-            x = conv_1(x)
-            norm = nn.BatchNorm3d(n_features)
-            x = F.relu(norm(x))
+            x = self.layers[layer_num](x)
+            layer_num += 1
+            x = F.relu(self.layers[layer_num](x))
+            layer_num += 1
 
             # Second convolution + batch norm + RELU
-            conv_2 = nn.Conv3d(n_features, n_features,
-                               kernel_size=self.conv_size)
-            x = conv_2(x)
-            norm = nn.BatchNorm3d(n_features)
-            x = F.relu(norm(x))
+            x = self.layers[layer_num](x)
+            layer_num += 1
+            x = F.relu(self.layers[layer_num](x))
+            layer_num += 1
 
         # Final convolution layer
-        conv_final = nn.Conv3d(n_features, self.n_class,
-                               kernel_size=1)
-        x = conv_final(x)
+        x = self.layers[layer_num](x)
         return x
