@@ -40,7 +40,7 @@ class AnalysisLayer(nn.Module):
         self.bn2 = nn.BatchNorm3d(n_features*2)
         self.upconv = upconv
 
-    def forward(self, x):
+    def forward(self, x: Variable) -> Variable:
         """Forward pass through layer."""
         if self.pooling is not None:
             x = self.pooling(x)
@@ -87,7 +87,7 @@ class SynthesisLayer(nn.Module):
                                              kernel_size=upconv_size,
                                              stride=upconv_size)
 
-    def forward(self, x):
+    def forward(self, x: Variable) -> Variable:
         """Forward pass through layer."""
         x = self.conv1(x)
         x = self.bn1(x)
