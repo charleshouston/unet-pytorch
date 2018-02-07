@@ -238,7 +238,7 @@ class MicroscopyDataset(Dataset):
         Raises:
             ValueError: When net input and output dimensionality is not equal.
         """
-        self.data_dir = Path(data_dir)
+        self.data_dir = Path.cwd() / data_dir
 
         if len(net_size_in) != len(net_size_out):
             raise ValueError('Network input and output shapes must have '
