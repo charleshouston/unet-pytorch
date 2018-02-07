@@ -196,14 +196,27 @@ class SplineDeformation(object):
                    for i in range(3)]
         image_deformed = np.reshape(sp.ndimage.interpolation.map_coordinates(
                 image, indices, order=3, mode='reflect'),
-                image.shape).astype(np.uint8)
+                image.shape)
         mask_deformed = np.reshape(sp.ndimage.interpolation.map_coordinates(
                 mask, indices, order=3, mode='reflect'),
                 mask.shape)
         # TODO: account for more than 2 classes
-        mask_deformed = ((mask_deformed > 255/2) * 255).astype(np.uint8)
+        mask_deformed = ((mask_deformed > 255/2) * 255)
 
         return {'image': image_deformed, 'mask': mask_deformed}
+
+
+class ToTensor(object):
+    """Converts ndarray to torch Tensor."""
+
+    def __call__(self, sample: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
+        image, mask = sample['image'], sample['mask']
+
+        # Numpy format is D x H x W
+        # torch expects C x D x H x W
+        image = image.reshape((1,) + image.shape)
+        return {'image': torch.from_numpy(image).float(),
+                'mask': torch.from_numpy(mask).float()}
 
 
 class MicroscopyDataset(Dataset):
@@ -245,6 +258,8 @@ class MicroscopyDataset(Dataset):
                          (size_in - size_out) // 2)
                         for size_in, size_out in zip(net_size_in, net_size_out)]
 
+        self.tensor_trns = ToTensor() #TODO: fix this quick hack.
+
     def __len__(self) -> int:
         return self.length
 
@@ -256,9 +271,9 @@ class MicroscopyDataset(Dataset):
         sample = {'image': img, 'mask': mask}
         if self.transform:
             sample = self.transform(sample)
-        sample['image'] = sample['image'].reshape((1,) + sample['image'].shape)
         sample['mask'] = ski.util.crop(sample['mask'], self.padding)
         sample['mask'] = self.sparsify(sample['mask'], self.n_classes)
+        sample = self.tensor_trns(sample)
         return sample
 
     def _generate_tile_images(self, tile_size: Tuple[int],
