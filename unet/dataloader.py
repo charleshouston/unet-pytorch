@@ -252,11 +252,12 @@ class MicroscopyDataset(Dataset):
         self.n_classes = n_classes
         self.transform = transform
 
-        self.length = self._generate_tile_images(self.net_size_in,
-                                                 self.net_size_out)
         self.padding = [((size_in - size_out) // 2,
                          (size_in - size_out) // 2)
                         for size_in, size_out in zip(net_size_in, net_size_out)]
+
+        self.length = self._generate_tile_images(self.net_size_in,
+                                                 self.net_size_out)
 
         self.tensor_trns = ToTensor() #TODO: fix this quick hack.
 
