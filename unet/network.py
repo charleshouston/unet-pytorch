@@ -7,6 +7,8 @@ from torch.autograd import Variable
 import torch.nn as nn
 import torch.nn.functional as F
 
+from unet.custom_layers import Softmax3d
+
 
 class AnalysisLayer(nn.Module):
     """Module for analysis layer of U-Net architecture."""
@@ -103,6 +105,27 @@ class SynthesisLayer(nn.Module):
         return x
 
 
+class FinalLayer(nn.Module):
+    """Final layer to reduce to classed pixels."""
+    def __init__(self, n_features: int, n_classes: int):
+        """Initilisation.
+
+        Args:
+            n_features: Number of input features.
+            n_classes: Final number of classes.
+        """
+        super(FinalLayer, self).__init__()
+        self.conv_fc = nn.Conv3d(n_features, n_classes, kernel_size=1)
+        self.softmax = Softmax3d()
+
+    def forward(self, x: Variable) -> Variable:
+        """Forward pass through layer."""
+        x = self.conv_fc(x)
+        x = self.softmax(x)
+
+        return x
+
+
 class UNet3D(nn.Module):
     """3D U-Net network architecture."""
 
@@ -171,9 +194,8 @@ class UNet3D(nn.Module):
                 layers.append(SynthesisLayer(n_features))
             n_features //= 3
 
-        # Final convolution layer
-        layers.append(nn.Conv3d(n_features, self.n_class,
-                                kernel_size=1))
+        # Final layer
+        layers.append(FinalLayer(n_features, self.n_class))
 
         return layers
 
@@ -254,4 +276,5 @@ class UNet3D(nn.Module):
             if i < self.n_layer-1:
                 # Save for shortcut connection.
                 dw_features.append(x.clone())
+
         return x
