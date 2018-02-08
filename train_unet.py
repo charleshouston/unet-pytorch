@@ -61,18 +61,19 @@ def train_model(model: nn.Module, criterion: nn.Module,
 
             # Forward step.
             output = model(image)
-            loss = criterion(
-                    torch.t(output.permute(1, 0, 2, 3, 4)
-                            .view([2, -1])),
-                    torch.t(mask.permute(1, 0, 2, 3, 4)
-                            .view([2, -1]))
-                            .long()[:, 1])
+            output = torch.t(output.permute(1, 0, 2, 3, 4)
+                             .view([2, -1]))
+            target = torch.t(mask.permute(1, 0, 2, 3, 4)
+                             .view([2, -1]))
+                             .long()[:, 1]
+            loss = criterion(output, target)
             loss.backward()
             optimizer.step()
 
             # Print statistics.
-            running_loss += loss.data[0] * image.size(0)
-            running_corrects += torch.sum(output == mask)
+            running_loss += loss.data[0]
+            _, binary_output = torch.max(output, dim=1)
+            running_corrects += torch.sum(output == mask) / output.size()[0]
 
         epoch_loss = running_loss / len(dataset)
         epoch_acc = running_corrects / len(dataset)
