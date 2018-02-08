@@ -64,8 +64,7 @@ def train_model(model: nn.Module, criterion: nn.Module,
             output = torch.t(output.permute(1, 0, 2, 3, 4)
                              .view([2, -1]))
             target = torch.t(mask.permute(1, 0, 2, 3, 4)
-                             .view([2, -1]))
-                             .long()[:, 1]
+                             .view([2, -1])).long()[:, 1]
             loss = criterion(output, target)
             loss.backward()
             optimizer.step()
