@@ -65,6 +65,8 @@ def train_model(model: nn.Module, criterion: nn.Module,
                              .view([2, -1]))
             target = torch.t(mask.permute(1, 0, 2, 3, 4)
                              .view([2, -1])).long()[:, 1]
+
+            # Backward step.
             loss = criterion(output, target)
             loss.backward()
             optimizer.step()
@@ -72,7 +74,7 @@ def train_model(model: nn.Module, criterion: nn.Module,
             # Print statistics.
             running_loss += loss.data[0]
             _, binary_output = torch.max(output, dim=1)
-            running_corrects += torch.sum(output == mask) / output.size()[0]
+            running_corrects += torch.mean(binary_output == target).float())
 
         epoch_loss = running_loss / len(dataset)
         epoch_acc = running_corrects / len(dataset)
