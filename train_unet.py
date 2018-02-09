@@ -74,7 +74,7 @@ def train_model(model: nn.Module, criterion: nn.Module,
             # Print statistics.
             running_loss += loss.data[0]
             _, binary_output = torch.max(output, dim=1)
-            running_corrects += torch.mean(binary_output == target).float())
+            running_corrects += torch.mean((binary_output == target).float())
 
         epoch_loss = running_loss / len(dataset)
         epoch_acc = running_corrects / len(dataset)
