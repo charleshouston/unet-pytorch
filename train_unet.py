@@ -16,8 +16,8 @@ import unet.dataloader as dl
 affine = dl.AffineTransform3D(range_rotate=360.0, range_zoom=0.0,
                               range_shift=(0.1, 0.1, 0.1))
 spline = dl.SplineDeformation(image_shape=(116, 132, 132),
-                                spacing_cpts=32,
-                                stdev=4)
+                              spacing_cpts=32,
+                              stdev=4)
 transform = tt.Compose([affine, spline])
 
 dataset = dl.MicroscopyDataset('data/train', net_size_in=(116, 132, 132),
@@ -28,7 +28,7 @@ dataloader = DataLoader(dataset, batch_size=1, shuffle=True, num_workers=4)
 
 def train_model(model: nn.Module, criterion: nn.Module,
                 optimizer: nn.Module, scheduler: nn.Module,
-                num_epochs: int=25) -> nn.Module:
+                num_epochs: int=5) -> nn.Module:
     """Train 3D U-Net."""
 
     since = time.time()
@@ -77,7 +77,7 @@ def train_model(model: nn.Module, criterion: nn.Module,
             running_corrects += torch.mean((binary_output == target).float())
 
         epoch_loss = running_loss / len(dataset)
-        epoch_acc = running_corrects / len(dataset)
+        epoch_acc = running_corrects.data[0] / len(dataset)
 
         print('Loss: {:.4f} Acc: {:.4f}'.format(epoch_loss, epoch_acc))
 
