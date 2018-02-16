@@ -111,4 +111,6 @@ optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.99)
 exp_lr_scheduler = lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
 
 model_ft = train_model(model, criterion, optimizer, exp_lr_scheduler)
-torch.save(model_ft.state_dict(), 'trained.pkl')
+
+with open('trained.pkl', 'w') as f:
+    torch.save(model_ft.state_dict(), f.name)
