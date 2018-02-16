@@ -7,7 +7,7 @@ from torch.autograd import Variable
 import torch.nn as nn
 import torch.nn.functional as F
 
-from unet.custom_layers import Softmax3d
+from models.custom_layers import Softmax3d
 
 
 class AnalysisLayer(nn.Module):
