@@ -9,8 +9,8 @@ import torchvision.transforms as tt
 import time
 import copy
 
-from unet.network import UNet3D
-import unet.dataloader as dl
+from models.unet import UNet3D
+import models.dataloader as dl
 
 
 affine = dl.AffineTransform3D(range_rotate=360.0, range_zoom=0.0,
@@ -20,9 +20,9 @@ spline = dl.SplineDeformation(image_shape=(116, 132, 132),
                               stdev=4)
 transform = tt.Compose([affine, spline])
 
-dataset = dl.MicroscopyDataset('data/train', net_size_in=(116, 132, 132),
-                               net_size_out=(28, 44, 44), n_classes=2,
-                               transform=transform)
+dataset = dl.AugmentedDataset('data/train', net_size_in=(116, 132, 132),
+                              net_size_out=(28, 44, 44), n_classes=2,
+                              transform=transform)
 dataloader = DataLoader(dataset, batch_size=1, shuffle=True, num_workers=4)
 
 

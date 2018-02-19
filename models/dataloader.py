@@ -219,12 +219,12 @@ class ToTensor(object):
                 'mask': torch.from_numpy(mask).float()}
 
 
-class MicroscopyDataset(Dataset):
-    """Data of volumetric image(s) from confocal microscopy."""
+class AugmentedDataset(Dataset):
+    """Data of real-time augmentation of volumetric image(s)."""
 
     def __init__(self, data_dir: str,
-                 net_size_in: Tuple[int], net_size_out: Tuple[int],
-                 n_classes: int,
+                 net_size_in: Tuple[int], net_size_out: Tuple[int]=None,
+                 n_classes: int=2,
                  transform: Callable=None):
         """Initialisation.
 
@@ -239,25 +239,32 @@ class MicroscopyDataset(Dataset):
             ValueError: When net input and output dimensionality is not equal.
         """
         self.data_dir = Path.cwd() / data_dir
-
-        if len(net_size_in) != len(net_size_out):
-            raise ValueError('Network input and output shapes must have '
-                             'equal dimensions.'
-                             'Got input size: {}'
-                             'Got output size: {}'
-                             .format(len(net_size_in), len(net_size_out)))
         self.net_size_in = net_size_in
-        self.net_size_out = net_size_out
+        if net_size_out is not None:
+            self.net_size_out = net_size_out
+            if len(net_size_in) != len(net_size_out):
+                raise ValueError('Network input and output shapes must have '
+                                 'equal dimensions.'
+                                 'Got input size: {}'
+                                 'Got output size: {}'
+                                 .format(len(net_size_in), len(net_size_out)))
+        else:
+            self.net_size_out = net_size_in
 
         self.n_classes = n_classes
         self.transform = transform
 
         self.padding = [((size_in - size_out) // 2,
                          (size_in - size_out) // 2)
-                        for size_in, size_out in zip(net_size_in, net_size_out)]
+                        for size_in, size_out in zip(self.net_size_in,
+                                                     self.net_size_out)]
 
+        if net_size_out is None:
+            self.tile_step = tuple([i // 2 for i in self.net_size_in])
+        else:
+            self.tile_step = self.net_size_out
         self.length = self._generate_tile_images(self.net_size_in,
-                                                 self.net_size_out)
+                                                 self.tile_step)
 
         self.tensor_trns = ToTensor() #TODO: fix this quick hack.
 
@@ -272,7 +279,8 @@ class MicroscopyDataset(Dataset):
         sample = {'image': img, 'mask': mask}
         if self.transform:
             sample = self.transform(sample)
-        sample['mask'] = ski.util.crop(sample['mask'], self.padding)
+        if self.net_size_in != self.net_size_out:
+            sample['mask'] = ski.util.crop(sample['mask'], self.padding)
         sample['mask'] = self.sparsify(sample['mask'], self.n_classes)
         sample = self.tensor_trns(sample)
         return sample
@@ -340,3 +348,4 @@ class MicroscopyDataset(Dataset):
         """Convert multi-class mask to separate binary masks."""
         return 1*np.asarray([np.isclose(arr, j/(n_classes-1)*255)
                              for j in range(n_classes)])
+
