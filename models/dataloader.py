@@ -140,59 +140,52 @@ class SplineDeformation(object):
     Interpolates using cubic splines from deformed control points.
     """
 
-    def __init__(self, image_shape: Tuple[int], spacing_cpts: int=32,
+    def __init__(self, im_shape: Tuple[int], cpts_shape: Tuple[int],
                  stdev: int=4):
         """Initialisation.
 
         Args:
-            image_shape: Shape of image to be deformed in pixels.
-            spacing_cpts: Spacing between control points for deformation
-                in pixels.
+            im_shape: Shape of image to be deformed in pixels.
+            cpts_shape: Shape of space of control points.
             stdev: Standard deviation of random deformation in pixels.
         """
-        self.image_shape = image_shape
-        self.spacing_cpts = spacing_cpts
-        self.cpts = np.mgrid[0:image_shape[0]:spacing_cpts,
-                             0:image_shape[1]:spacing_cpts,
-                             0:image_shape[2]:spacing_cpts]
+        self.im_shape = im_shape
+        self.cpts = np.empty((3,) + cpts_shape)
+        self.disp_shape = tuple([self.cpts.shape[0]]
+                                + [sh-2 for sh in self.cpts.shape[1:]])
         self.stdev = stdev
-
-        max_cpt = np.max(self.cpts.reshape(3, -1), axis=1)
-        limits = self.image_shape / max_cpt * self.cpts.shape[1:] - 1
-        coords = [np.linspace(0, limits[i], image_shape[i])
-                  for i in range(3)]
-        self.cpts_to_pixels = np.asarray(np.meshgrid(*coords, indexing='ij'))
-
-        self.pixel_grid = np.mgrid[0:image_shape[0],
-                                   0:image_shape[1],
-                                   0:image_shape[2]]
+        self.interp_ind = np.mgrid[0:self.cpts.shape[1]-1:self.im_shape[0]*1j,
+                                   0:self.cpts.shape[2]-1:self.im_shape[1]*1j,
+                                   0:self.cpts.shape[3]-1:self.im_shape[2]*1j]
+        self.px_grid = np.mgrid[0:self.im_shape[0],
+                                0:self.im_shape[1],
+                                0:self.im_shape[2]]
 
     def __call__(self, sample: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
         """Perform deformation on sample."""
-
         image, mask = sample['image'], sample['mask']
-        cpts_flat = np.reshape(self.cpts,
-                               (self.cpts.shape[0], -1)).T
-        displacements = np.empty_like(cpts_flat)
-        for i in range(len(displacements)):
-            displacements[i, :] = np.random.normal(0, self.stdev, 3)
-        displacements = np.reshape(displacements.T, self.cpts.shape)
+        displacements = np.random.normal(0, self.stdev, self.disp_shape)
+        # Set boundary displacements to zero by padding
+        displacements = np.pad(displacements,
+                               ((0, 0),)
+                                + ((1, 1),)*(len(displacements.shape)-1),
+                               mode='constant')
 
         # Interpolate from cpts to pixels using cubic splines.
         dx = sp.ndimage.interpolation.map_coordinates(
-                displacements[0,:], self.cpts_to_pixels,
+                displacements[0,:], self.interp_ind,
                 order=3, mode='reflect')
         dy = sp.ndimage.interpolation.map_coordinates(
-                displacements[1,:], self.cpts_to_pixels,
+                displacements[1,:], self.interp_ind,
                 order=3, mode='reflect')
         dz = sp.ndimage.interpolation.map_coordinates(
-                displacements[2,:], self.cpts_to_pixels,
+                displacements[2,:], self.interp_ind,
                 order=3, mode='reflect')
 
         pixels_displaced = np.asarray([dx, dy, dz])
-
+        import pdb;pdb.set_trace()
         # Displace pixels.
-        indices = [self.pixel_grid[i] + pixels_displaced[i]
+        indices = [self.px_grid[i] + pixels_displaced[i]
                    for i in range(3)]
         image_deformed = np.reshape(sp.ndimage.interpolation.map_coordinates(
                 image, indices, order=3, mode='reflect'),
