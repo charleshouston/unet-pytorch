@@ -145,7 +145,7 @@ class MLSDeformation(object):
             raise ValueError('ps and qs should be the same shape.'
                              'Got ps.shape: {}'
                              'Got qs.shape: {}'
-                             .format(ps.shape, qs.shape))
+                             .format(self.ps.shape, qs.shape))
         self.qs = qs
         grid_deformed = np.asarray([self._deform_coord(v)
                                     for v in self.grid])

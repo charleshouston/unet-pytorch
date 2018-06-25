@@ -1,15 +1,16 @@
 import torch
+from torch import Tensor
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.autograd import Function, Variable
+from torch.autograd import Function
 from torch.autograd._functions.utils import prepare_onnx_paddings
 from torch.nn.modules.utils import _ntuple
 
 from typing import Union, Tuple
 
 
-def flip(x: Variable, dim: int) -> Variable:
-    """Flip torch Variable along given dimension axis."""
+def flip(x: Tensor, dim: int) -> Tensor:
+    """Flip torch Tensor along given dimension axis."""
     xsize = x.size()
     dim = x.dim() + dim if dim < 0 else dim
     x = x.contiguous().view(-1, *xsize[dim:])
@@ -25,8 +26,8 @@ class ReflectionPad3d(nn.Module):
         super(ReflectionPad3d, self).__init__()
         self.padding = _ntuple(6)(padding)
 
-    def forward(self, input: Variable) -> Variable:
-        return ReflectionPadNd.apply(input, self.padding)
+    def forward(self, x: Tensor) -> Tensor:
+        return ReflectionPadNd.apply(x, self.padding)
 
     def __repr__(self) -> str:
         return self.__class__.__name__ + '(' \
@@ -37,15 +38,15 @@ class ReflectionPadNd(Function):
     """Padding for same convolutional layer."""
 
     @staticmethod
-    def symbolic(g, input: Variable, padding: Union[int, Tuple[int]]):
-        paddings = prepare_onnx_paddings(len(input.type().sizes()), pad)
-        return g.op("Pad", input, pads_i=paddings, mode_s="reflect")
+    def symbolic(g, x: Tensor, padding: Union[int, Tuple[int]]):
+        paddings = prepare_onnx_paddings(len(x.type().sizes()), pad)
+        return g.op("Pad", x, pads_i=paddings, mode_s="reflect")
 
     @staticmethod
-    def forward(ctx: Function, input: Variable, pad: Tuple[int]) -> Variable:
+    def forward(ctx: Function, x: Tensor, pad: Tuple[int]) -> Tensor:
         ctx.pad = pad
-        ctx.input_size = input.size()
-        ctx.l_inp = len(input.size())
+        ctx.input_size = x.size()
+        ctx.l_inp = len(x.size())
         ctx.pad_tup = tuple([(a, b)
                              for a, b in zip(pad[:-1:2], pad[1::2])]
                             [::-1])
@@ -54,12 +55,12 @@ class ReflectionPadNd(Function):
         assert ctx.l_inp >= ctx.l_pad
 
         new_dim = tuple([sum((d,) + ctx.pad_tup[i])
-                         for i, d in enumerate(input.size()[-ctx.l_pad:])])
+                         for i, d in enumerate(x.size()[-ctx.l_pad:])])
         assert all([d > 0 for d in new_dim]), 'input is too small'
 
         # Create output tensor by concatenating with reflected chunks.
-        output = input.new(input.size()[:(ctx.l_diff)] + new_dim).zero_()
-        c_input = input
+        output = x.new(x.size()[:(ctx.l_diff)] + new_dim).zero_()
+        c_input = x
 
         for i, p in zip(range(ctx.l_inp)[-ctx.l_pad:], ctx.pad_tup):
             if p[0] > 0:
@@ -72,8 +73,8 @@ class ReflectionPadNd(Function):
         return output
 
     @staticmethod
-    def backward(ctx: Function, grad_output: Variable) -> Variable:
-        grad_input = Variable(grad_output.data.new(ctx.input_size).zero_())
+    def backward(ctx: Function, grad_output: Tensor) -> Tensor:
+        grad_input = Tensor(grad_output.data.new(ctx.input_size).zero_())
         grad_input_slices = [slice(0, x,) for x in ctx.input_size]
 
         cg_output = grad_output
@@ -96,9 +97,9 @@ class Softmax3d(nn.Module):
     Expects a volumetric image of dimensions `(N, C, D, H, W)`.
     """
 
-    def forward(self, input: Variable) -> Variable:
-        assert input.dim() == 5, 'Softmax3d requires a 5D Tensor.'
-        return F.softmax(input, 1, _stacklevel=5)
+    def forward(self, x: Tensor) -> Tensor:
+        assert x.dim() == 5, 'Softmax3d requires a 5D Tensor.'
+        return F.softmax(x, 1, _stacklevel=5)
 
     def __repr__(self) -> str:
         return self.__class__.__name__ + '()'

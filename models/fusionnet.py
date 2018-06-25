@@ -2,7 +2,7 @@
 
 from typing import Union, Tuple
 import torch
-from torch.autograd import Variable
+from torch import Tensor
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
@@ -32,7 +32,7 @@ class ResidualLayer(nn.Module):
                                kernel_size=3)
         self.bn3 = nn.BatchNorm3d(features_in)
 
-    def forward(self, x: Variable) -> Variable:
+    def forward(self, x: Tensor) -> Tensor:
         """Foward pass through layer."""
         residual = x
         out = self.conv1(self.pad(x))
@@ -67,7 +67,7 @@ class BasicBlock(nn.Module):
                                kernel_size=3)
         self.bn2 = nn.BatchNorm3d(features_out)
 
-    def forward(self, x: Variable) -> Variable:
+    def forward(self, x: Tensor) -> Tensor:
         """Forward pass through layer."""
         out = self.conv1(self.pad(x))
         out = self.relu(out)
@@ -103,7 +103,7 @@ class EncodingLayer(nn.Module):
         self.basic = BasicBlock(features_in, features_out)
         self.pooling = pooling
 
-    def forward(self, x: Variable) -> Variable:
+    def forward(self, x: Tensor) -> Tensor:
         """Forward pass through layer."""
         if self.pooling is not None:
             x = self.pooling(x)
@@ -128,7 +128,7 @@ class BridgeLayer(nn.Module):
                                          kernel_size=2,
                                          stride=2)
 
-    def forward(self, x: Variable) -> Variable:
+    def forward(self, x: Tensor) -> Tensor:
         """Forward pass through layer."""
         out = self.pooling(x)
         out = self.basic(out)
@@ -158,7 +158,7 @@ class DecodingLayer(nn.Module):
                                              kernel_size=2,
                                              stride=2)
 
-    def forward(self, x: Variable) -> Variable:
+    def forward(self, x: Tensor) -> Tensor:
         """Forward pass through layer."""
         out = self.basic(x)
         if self.deconv is not None:
@@ -225,7 +225,7 @@ class FusionNet3d(nn.Module):
 
         return layers
 
-    def forward(self, x: Variable) -> Variable:
+    def forward(self, x: Tensor) -> Tensor:
         """Forward pass through network.
 
         Args:
@@ -244,6 +244,6 @@ class FusionNet3d(nn.Module):
             x = layer(x)
 
             if i < self.res_levels-1:
-                shortcut_connections.append(x)
+                shortcut_connections.append(x.detach())
 
         return x

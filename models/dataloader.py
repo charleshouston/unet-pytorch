@@ -183,7 +183,7 @@ class SplineDeformation(object):
                 order=3, mode='reflect')
 
         pixels_displaced = np.asarray([dx, dy, dz])
-        import pdb;pdb.set_trace()
+
         # Displace pixels.
         indices = [self.px_grid[i] + pixels_displaced[i]
                    for i in range(3)]
