@@ -8,6 +8,11 @@
     and Computer-Assisted Intervention 2016 Oct 17 (pp. 424-432). Springer
     International Publishing.
 
-Implemented in Python 3.6 and PyTorch 0.3.0.
+Also includes FusionNet architecture::
+    Quan TM, Hilderbrand DG, Jeong WK. FusionNet: A deep fully residual
+    convolutional neural network for image segmentation in connectomics. arXiv
+    preprint arXiv:1612.05360. 2016 Dec 16.
+
+Implemented in Python 3.6 and PyTorch 0.4.0.
 
 Copyright (c) 2018 Charles Houston
